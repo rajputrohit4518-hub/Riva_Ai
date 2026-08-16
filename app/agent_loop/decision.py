@@ -16,6 +16,17 @@ class DecisionMaker:
             raise ValueError("User input cannot be empty.")
 
         if context is not None:
+            follow_up_response = self._conversation_response(
+                text,
+                context,
+            )
+
+            if follow_up_response is not None:
+                return AgentDecision(
+                    decision_type=DecisionType.RESPOND,
+                    response=follow_up_response,
+                )
+
             memory_response = self._memory_response(
                 text,
                 context,
@@ -58,6 +69,37 @@ class DecisionMaker:
                 "but I don't have a capability for it yet."
             ),
         )
+
+    def _conversation_response(
+        self,
+        text: str,
+        context: ContextSnapshot,
+    ) -> str | None:
+        if len(context.recent_messages) < 2:
+            return None
+
+        follow_up = any(
+            phrase in text
+            for phrase in (
+                "what did i just tell you",
+                "what did i tell you",
+                "what did i say",
+                "what was i saying",
+                "what did we just discuss",
+            )
+        )
+
+        if not follow_up:
+            return None
+
+        for message in reversed(context.recent_messages[:-1]):
+            if message.get("role") == "user":
+                content = str(message.get("content", "")).strip()
+
+                if content:
+                    return content
+
+        return None
 
     def _memory_response(
         self,
