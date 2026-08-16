@@ -4878,3 +4878,235 @@ def test_agent_loop_has_bounded_step_limit():
 
 
 
+
+def test_agent_loop_passes_context_to_context_aware_decision_maker():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    orchestrator = RivaOrchestrator(
+        registry=create_default_registry(),
+        memory_manager=MemoryManager(
+            MemoryStore(database_path),
+        ),
+    )
+
+    class ContextAwareDecisionMaker:
+        supports_context = True
+
+        def __init__(self):
+            self.context = None
+
+        def decide(self, user_input, context):
+            self.context = context
+
+            return AgentDecision(
+                decision_type=DecisionType.RESPOND,
+                response=f"Context session: {context.session_id}",
+            )
+
+    decision_maker = ContextAwareDecisionMaker()
+
+    loop = RivaAgentLoop(
+        orchestrator=orchestrator,
+        decision_maker=decision_maker,
+    )
+
+    session = RivaSession(
+        session_id="context-aware-agent",
+    )
+
+    result = loop.run(
+        session=session,
+        user_input="hello",
+    )
+
+    assert decision_maker.context is not None
+    assert decision_maker.context.session_id == "context-aware-agent"
+    assert result.response == "Context session: context-aware-agent"
+
+def test_agent_loop_context_contains_previous_conversation():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    orchestrator = RivaOrchestrator(
+        registry=create_default_registry(),
+        memory_manager=MemoryManager(
+            MemoryStore(database_path),
+        ),
+    )
+
+    class ContextAwareDecisionMaker:
+        supports_context = True
+
+        def decide(self, user_input, context):
+            self.context = context
+            previous = context.recent_messages
+
+            if previous:
+                return AgentDecision(
+                    decision_type=DecisionType.RESPOND,
+                    response=previous[0]["content"],
+                )
+
+            return AgentDecision(
+                decision_type=DecisionType.RESPOND,
+                response="No previous context.",
+            )
+
+    decision_maker = ContextAwareDecisionMaker()
+
+    loop = RivaAgentLoop(
+        orchestrator=orchestrator,
+        decision_maker=decision_maker,
+    )
+
+    session = RivaSession(
+        session_id="conversation-context-test",
+    )
+
+    session.add_message(
+        "user",
+        "My favorite language is Python.",
+    )
+
+    result = loop.run(
+        session=session,
+        user_input="What did I just tell you?",
+    )
+
+    assert len(decision_maker.context.recent_messages) == 2
+    assert (
+        decision_maker.context.recent_messages[0]["content"]
+        == "My favorite language is Python."
+    )
+    assert (
+        decision_maker.context.recent_messages[1]["content"]
+        == "What did I just tell you?"
+    )
+    assert result.response == "My favorite language is Python."
+
+
+def test_agent_loop_context_contains_relevant_memory():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    memory_manager = MemoryManager(
+        MemoryStore(database_path),
+    )
+
+    memory_manager.remember(
+        key="favorite_language",
+        value="Python",
+        category="preference",
+    )
+
+    orchestrator = RivaOrchestrator(
+        registry=create_default_registry(),
+        memory_manager=memory_manager,
+    )
+
+    class MemoryAwareDecisionMaker:
+        supports_context = True
+
+        def decide(self, user_input, context):
+            self.context = context
+
+            if context.memories:
+                memory = context.memories[0]
+
+                return AgentDecision(
+                    decision_type=DecisionType.RESPOND,
+                    response=(
+                        f"Your favorite language is "
+                        f"{memory.value}."
+                    ),
+                )
+
+            return AgentDecision(
+                decision_type=DecisionType.RESPOND,
+                response="I don't remember.",
+            )
+
+    decision_maker = MemoryAwareDecisionMaker()
+
+    loop = RivaAgentLoop(
+        orchestrator=orchestrator,
+        decision_maker=decision_maker,
+    )
+
+    session = RivaSession(
+        session_id="memory-context-test",
+    )
+
+    result = loop.run(
+        session=session,
+        user_input="What is my favorite programming language?",
+    )
+
+    assert len(decision_maker.context.memories) == 1
+    assert (
+        decision_maker.context.memories[0].key
+        == "favorite_language"
+    )
+    assert (
+        decision_maker.context.memories[0].value
+        == "Python"
+    )
+    assert result.response == "Your favorite language is Python."
+
+def test_default_decision_maker_uses_memory_context():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    memory_manager = MemoryManager(
+        MemoryStore(database_path),
+    )
+
+    memory_manager.remember(
+        key="favorite_language",
+        value="Python",
+        category="preference",
+    )
+
+    orchestrator = RivaOrchestrator(
+        registry=create_default_registry(),
+        memory_manager=memory_manager,
+    )
+
+    decision_maker = DecisionMaker()
+
+    loop = RivaAgentLoop(
+        orchestrator=orchestrator,
+        decision_maker=decision_maker,
+    )
+
+    session = RivaSession(
+        session_id="default-memory-decision",
+    )
+
+    result = loop.run(
+        session=session,
+        user_input="What is my favorite language?",
+    )
+
+    assert result.response == "Python"

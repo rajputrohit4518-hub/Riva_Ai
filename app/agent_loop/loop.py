@@ -27,17 +27,28 @@ class RivaAgentLoop:
             user_input=user_input,
         )
 
-        # The existing/default DecisionMaker is a single-decision
-        # planner. Preserve its established contract: one successful
-        # tool execution produces the final response.
         multi_step = getattr(
             self._decision,
             "supports_multi_step",
             False,
         )
 
+        supports_context = getattr(
+            self._decision,
+            "supports_context",
+            False,
+        )
+
         for _ in range(self.MAX_STEPS):
-            decision = self._decision.decide(user_input)
+            if supports_context:
+                decision = self._decision.decide(
+                    user_input,
+                    orchestration.context,
+                )
+            else:
+                decision = self._decision.decide(
+                    user_input,
+                )
 
             if decision.decision_type == DecisionType.RESPOND:
                 return self._orchestrator.respond(
@@ -59,7 +70,6 @@ class RivaAgentLoop:
 
                 latest = execution.executions[-1]
 
-                # Failed execution always terminates the agent loop.
                 if latest.status.value != "success":
                     return self._orchestrator.respond(
                         orchestration,
@@ -69,16 +79,12 @@ class RivaAgentLoop:
                         ),
                     )
 
-                # Preserve the original one-tool contract unless the
-                # decision maker explicitly supports multi-step execution.
                 if not multi_step:
                     return self._orchestrator.respond(
                         orchestration,
                         str(latest.result),
                     )
 
-                # A multi-step decision maker gets another opportunity
-                # to decide what to do next.
                 continue
 
             raise RuntimeError(
@@ -90,4 +96,3 @@ class RivaAgentLoop:
             orchestration,
             "I reached the maximum number of steps for this request.",
         )
-
