@@ -5110,3 +5110,93 @@ def test_default_decision_maker_uses_memory_context():
     )
 
     assert result.response == "Python"
+
+def test_default_decision_maker_handles_conversation_follow_up():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    orchestrator = RivaOrchestrator(
+        registry=create_default_registry(),
+        memory_manager=MemoryManager(
+            MemoryStore(database_path),
+        ),
+    )
+
+    decision_maker = DecisionMaker()
+
+    loop = RivaAgentLoop(
+        orchestrator=orchestrator,
+        decision_maker=decision_maker,
+    )
+
+    session = RivaSession(
+        session_id="conversation-follow-up",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="My favorite language is Python.",
+    )
+
+    assert first.response != ""
+
+    second = loop.run(
+        session=session,
+        user_input="What did I just tell you?",
+    )
+
+    assert (
+        "Python" in second.response
+    )
+
+def test_default_decision_maker_uses_previous_user_message_for_follow_up():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    orchestrator = RivaOrchestrator(
+        registry=create_default_registry(),
+        memory_manager=MemoryManager(
+            MemoryStore(database_path),
+        ),
+    )
+
+    decision_maker = DecisionMaker()
+
+    loop = RivaAgentLoop(
+        orchestrator=orchestrator,
+        decision_maker=decision_maker,
+    )
+
+    session = RivaSession(
+        session_id="conversation-follow-up-user-message",
+    )
+
+    session.add_message(
+        "user",
+        "My favorite programming language is Python.",
+    )
+
+    session.add_message(
+        "assistant",
+        "That's useful to know.",
+    )
+
+    result = loop.run(
+        session=session,
+        user_input="What did I just tell you?",
+    )
+
+    assert (
+        result.response
+        == "My favorite programming language is Python."
+    )
