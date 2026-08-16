@@ -17,6 +17,8 @@ class RivaSession:
         default_factory=list
     )
 
+    last_response: str = ""
+
     def add_message(
         self,
         role: str,
