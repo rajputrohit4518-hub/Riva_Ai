@@ -1,4 +1,6 @@
-﻿from app.agent_loop.models import AgentDecision, DecisionType
+﻿import re
+
+from app.agent_loop.models import AgentDecision, DecisionType
 from app.context.models import ContextSnapshot
 
 
@@ -16,6 +18,14 @@ class DecisionMaker:
             raise ValueError("User input cannot be empty.")
 
         if context is not None:
+            entity_decision = self._entity_reference_decision(
+                text,
+                context,
+            )
+
+            if entity_decision is not None:
+                return entity_decision
+
             follow_up_response = self._conversation_response(
                 text,
                 context,
@@ -70,6 +80,102 @@ class DecisionMaker:
             ),
         )
 
+    def _entity_reference_decision(
+        self,
+        text: str,
+        context: ContextSnapshot,
+    ) -> AgentDecision | None:
+        if not context.last_response:
+            return None
+
+        if "it" not in text:
+            return None
+
+        previous_result = str(context.last_response).strip()
+
+        if not re.fullmatch(
+            r"-?\d+(?:\.\d+)?",
+            previous_result,
+        ):
+            return None
+
+        match = re.search(
+            r"\b(?:add|plus)\s+(-?\d+(?:\.\d+)?)\s+to\s+it\b",
+            text,
+        )
+
+        if match:
+            amount = match.group(1)
+
+            return AgentDecision(
+                decision_type=DecisionType.USE_TOOL,
+                tool_name="calculator",
+                tool_arguments={
+                    "expression": (
+                        f"{previous_result} + {amount}"
+                    ),
+                },
+            )
+
+        match = re.search(
+            r"\b(?:subtract|minus)\s+(-?\d+(?:\.\d+)?)"
+            r"\s+(?:from\s+)?it\b",
+            text,
+        )
+
+        if match:
+            amount = match.group(1)
+
+            return AgentDecision(
+                decision_type=DecisionType.USE_TOOL,
+                tool_name="calculator",
+                tool_arguments={
+                    "expression": (
+                        f"{previous_result} - {amount}"
+                    ),
+                },
+            )
+
+        match = re.search(
+            r"\b(?:multiply|times)\s+it\s+by\s+"
+            r"(-?\d+(?:\.\d+)?)\b",
+            text,
+        )
+
+        if match:
+            amount = match.group(1)
+
+            return AgentDecision(
+                decision_type=DecisionType.USE_TOOL,
+                tool_name="calculator",
+                tool_arguments={
+                    "expression": (
+                        f"{previous_result} * {amount}"
+                    ),
+                },
+            )
+
+        match = re.search(
+            r"\b(?:divide)\s+it\s+by\s+"
+            r"(-?\d+(?:\.\d+)?)\b",
+            text,
+        )
+
+        if match:
+            amount = match.group(1)
+
+            return AgentDecision(
+                decision_type=DecisionType.USE_TOOL,
+                tool_name="calculator",
+                tool_arguments={
+                    "expression": (
+                        f"{previous_result} / {amount}"
+                    ),
+                },
+            )
+
+        return None
+
     def _conversation_response(
         self,
         text: str,
@@ -121,6 +227,7 @@ class DecisionMaker:
                     return content
 
         return None
+
     def _memory_response(
         self,
         text: str,
@@ -149,4 +256,3 @@ class DecisionMaker:
                 return memory.value
 
         return None
-

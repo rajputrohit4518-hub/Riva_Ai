@@ -5241,3 +5241,157 @@ def test_default_decision_maker_resolves_previous_calculation_result():
     )
 
     assert second.response == "150"
+
+def test_default_decision_maker_resolves_it_to_previous_calculation_result():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    orchestrator = RivaOrchestrator(
+        registry=create_default_registry(),
+        memory_manager=MemoryManager(
+            MemoryStore(database_path),
+        ),
+    )
+
+    decision_maker = DecisionMaker()
+
+    loop = RivaAgentLoop(
+        orchestrator=orchestrator,
+        decision_maker=decision_maker,
+    )
+
+    session = RivaSession(
+        session_id="entity-reference-calculation",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="calculate 25 * 6",
+    )
+
+    assert first.response == "150"
+
+    second = loop.run(
+        session=session,
+        user_input="Now add 50 to it",
+    )
+
+    assert second.response == "200"
+
+def test_default_decision_maker_resolves_it_for_subtraction():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="entity-reference-subtraction",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="calculate 100 - 25",
+    )
+
+    assert first.response == "75"
+
+    second = loop.run(
+        session=session,
+        user_input="subtract 15 from it",
+    )
+
+    assert second.response == "60"
+
+
+def test_default_decision_maker_resolves_it_for_multiplication():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="entity-reference-multiplication",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="calculate 10 + 5",
+    )
+
+    assert first.response == "15"
+
+    second = loop.run(
+        session=session,
+        user_input="multiply it by 4",
+    )
+
+    assert second.response == "60"
+
+
+def test_default_decision_maker_resolves_it_for_division():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="entity-reference-division",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="calculate 100 / 4",
+    )
+
+    assert first.response == "25.0"
+
+    second = loop.run(
+        session=session,
+        user_input="divide it by 5",
+    )
+
+    assert second.response == "5.0"
