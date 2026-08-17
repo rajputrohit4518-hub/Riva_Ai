@@ -256,6 +256,38 @@ class DecisionMaker:
             )
         )
 
+        contextual_reference = any(
+            phrase in text
+            for phrase in (
+                "tell me more about the project",
+                "tell me more about this",
+                "tell me more about that",
+                "can you explain that",
+                "can you explain this",
+                "explain that",
+                "explain this",
+                "why is that important",
+                "why is this important",
+                "why is that",
+                "why is this",
+            )
+        )
+
+        if contextual_reference:
+            if len(context.recent_messages) >= 2:
+                for message in reversed(
+                    context.recent_messages[:-1]
+                ):
+                    if message.get("role") == "user":
+                        content = str(
+                            message.get("content", "")
+                        ).strip()
+
+                        if content:
+                            return content
+
+            return None
+
         result_reference = any(
             phrase in text
             for phrase in (

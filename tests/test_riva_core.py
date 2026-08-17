@@ -5557,3 +5557,125 @@ def test_default_decision_maker_resolves_previous_topic_with_the_above():
     )
 
     assert second.response == "The meeting is scheduled for Friday"
+
+def test_default_decision_maker_resolves_contextual_follow_up_about_project():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="contextual-reference-project",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="The project is called Aurora",
+    )
+
+    assert first.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    second = loop.run(
+        session=session,
+        user_input="Tell me more about the project",
+    )
+
+    assert second.response == "The project is called Aurora"
+
+
+def test_default_decision_maker_resolves_contextual_explanation_request():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="contextual-reference-explain",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="The meeting is scheduled for Friday",
+    )
+
+    assert first.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    second = loop.run(
+        session=session,
+        user_input="Can you explain that?",
+    )
+
+    assert second.response == "The meeting is scheduled for Friday"
+
+
+def test_default_decision_maker_resolves_contextual_why_request():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="contextual-reference-why",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="The project deadline is Friday",
+    )
+
+    assert first.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    second = loop.run(
+        session=session,
+        user_input="Why is that important?",
+    )
+
+    assert second.response == "The project deadline is Friday"
