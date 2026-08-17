@@ -5395,3 +5395,84 @@ def test_default_decision_maker_resolves_it_for_division():
     )
 
     assert second.response == "5.0"
+
+def test_default_decision_maker_resolves_previous_statement_reference():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="general-reference-statement",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="My favorite color is blue",
+    )
+
+    assert first.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    second = loop.run(
+        session=session,
+        user_input="What did I just tell you?",
+    )
+
+    assert second.response == "My favorite color is blue"
+
+
+def test_default_decision_maker_resolves_previous_statement_with_that():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="general-reference-that",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="The project deadline is Friday",
+    )
+
+    assert first.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    second = loop.run(
+        session=session,
+        user_input="What was that?",
+    )
+
+    assert second.response == "The project deadline is Friday"

@@ -88,10 +88,43 @@ class DecisionMaker:
         if not context.last_response:
             return None
 
-        if "it" not in text:
+        previous_result = str(context.last_response).strip()
+
+        general_reference = any(
+            phrase in text
+            for phrase in (
+                "what was that",
+                "what was that?",
+                "what was this",
+                "what was this?",
+                "what did you mean",
+                "what did you just say",
+                "what did you say",
+            )
+        )
+
+        if general_reference:
+            if (
+                len(context.recent_messages) >= 2
+                and context.recent_messages[-2].get("role") == "user"
+            ):
+                previous_user_message = str(
+                    context.recent_messages[-2].get(
+                        "content",
+                        "",
+                    )
+                ).strip()
+
+                if previous_user_message:
+                    return AgentDecision(
+                        decision_type=DecisionType.RESPOND,
+                        response=previous_user_message,
+                    )
+
             return None
 
-        previous_result = str(context.last_response).strip()
+        if "it" not in text:
+            return None
 
         if not re.fullmatch(
             r"-?\d+(?:\.\d+)?",
@@ -175,7 +208,6 @@ class DecisionMaker:
             )
 
         return None
-
     def _conversation_response(
         self,
         text: str,
