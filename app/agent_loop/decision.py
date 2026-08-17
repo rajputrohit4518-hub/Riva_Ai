@@ -2,10 +2,17 @@
 
 from app.agent_loop.models import AgentDecision, DecisionType
 from app.context.models import ContextSnapshot
+from app.context.resolver import ContextResolver
+from app.intent.models import IntentType
+from app.intent.resolver import IntentResolver
 
 
 class DecisionMaker:
     supports_context = True
+
+    def __init__(self) -> None:
+        self._context_resolver = ContextResolver()
+        self._intent_resolver = IntentResolver()
 
     def decide(
         self,
@@ -48,28 +55,18 @@ class DecisionMaker:
                     response=memory_response,
                 )
 
-        if text.startswith("calculate "):
-            expression = user_input.strip()[10:].strip()
+        intent = self._intent_resolver.resolve(user_input)
 
+        if intent.intent_type == IntentType.CALCULATION:
             return AgentDecision(
                 decision_type=DecisionType.USE_TOOL,
                 tool_name="calculator",
                 tool_arguments={
-                    "expression": expression,
+                    "expression": intent.expression or "",
                 },
             )
 
-        if any(
-            re.search(
-                rf"\b{re.escape(greeting)}\b",
-                text,
-            )
-            for greeting in (
-                "hello",
-                "hi",
-                "hey",
-            )
-        ):
+        if intent.intent_type == IntentType.GREETING:
             return AgentDecision(
                 decision_type=DecisionType.RESPOND,
                 response="Hello! I'm Riva. How can I help?",
@@ -107,22 +104,15 @@ class DecisionMaker:
         )
 
         if general_reference:
-            if (
-                len(context.recent_messages) >= 2
-                and context.recent_messages[-2].get("role") == "user"
-            ):
-                previous_user_message = str(
-                    context.recent_messages[-2].get(
-                        "content",
-                        "",
-                    )
-                ).strip()
+            previous_user_message = (
+                self._previous_user_message(context)
+            )
 
-                if previous_user_message:
-                    return AgentDecision(
-                        decision_type=DecisionType.RESPOND,
-                        response=previous_user_message,
-                    )
+            if previous_user_message:
+                return AgentDecision(
+                    decision_type=DecisionType.RESPOND,
+                    response=previous_user_message,
+                )
 
             return None
 
@@ -138,20 +128,15 @@ class DecisionMaker:
         )
 
         if natural_reference:
-            if len(context.recent_messages) >= 2:
-                for message in reversed(
-                    context.recent_messages[:-1]
-                ):
-                    if message.get("role") == "user":
-                        previous_user_message = str(
-                            message.get("content", "")
-                        ).strip()
+            previous_user_message = (
+                self._previous_user_message(context)
+            )
 
-                        if previous_user_message:
-                            return AgentDecision(
-                                decision_type=DecisionType.RESPOND,
-                                response=previous_user_message,
-                            )
+            if previous_user_message:
+                return AgentDecision(
+                    decision_type=DecisionType.RESPOND,
+                    response=previous_user_message,
+                )
 
             return None
 
@@ -170,14 +155,12 @@ class DecisionMaker:
         )
 
         if match:
-            amount = match.group(1)
-
             return AgentDecision(
                 decision_type=DecisionType.USE_TOOL,
                 tool_name="calculator",
                 tool_arguments={
                     "expression": (
-                        f"{previous_result} + {amount}"
+                        f"{previous_result} + {match.group(1)}"
                     ),
                 },
             )
@@ -189,14 +172,12 @@ class DecisionMaker:
         )
 
         if match:
-            amount = match.group(1)
-
             return AgentDecision(
                 decision_type=DecisionType.USE_TOOL,
                 tool_name="calculator",
                 tool_arguments={
                     "expression": (
-                        f"{previous_result} - {amount}"
+                        f"{previous_result} - {match.group(1)}"
                     ),
                 },
             )
@@ -208,14 +189,12 @@ class DecisionMaker:
         )
 
         if match:
-            amount = match.group(1)
-
             return AgentDecision(
                 decision_type=DecisionType.USE_TOOL,
                 tool_name="calculator",
                 tool_arguments={
                     "expression": (
-                        f"{previous_result} * {amount}"
+                        f"{previous_result} * {match.group(1)}"
                     ),
                 },
             )
@@ -227,19 +206,18 @@ class DecisionMaker:
         )
 
         if match:
-            amount = match.group(1)
-
             return AgentDecision(
                 decision_type=DecisionType.USE_TOOL,
                 tool_name="calculator",
                 tool_arguments={
                     "expression": (
-                        f"{previous_result} / {amount}"
+                        f"{previous_result} / {match.group(1)}"
                     ),
                 },
             )
 
         return None
+
     def _conversation_response(
         self,
         text: str,
@@ -256,37 +234,15 @@ class DecisionMaker:
             )
         )
 
-        contextual_reference = any(
-            phrase in text
-            for phrase in (
-                "tell me more about the project",
-                "tell me more about this",
-                "tell me more about that",
-                "can you explain that",
-                "can you explain this",
-                "explain that",
-                "explain this",
-                "why is that important",
-                "why is this important",
-                "why is that",
-                "why is this",
+        contextual_reference = (
+            self._context_resolver.resolve(
+                text,
+                context,
             )
         )
 
-        if contextual_reference:
-            if len(context.recent_messages) >= 2:
-                for message in reversed(
-                    context.recent_messages[:-1]
-                ):
-                    if message.get("role") == "user":
-                        content = str(
-                            message.get("content", "")
-                        ).strip()
-
-                        if content:
-                            return content
-
-            return None
+        if contextual_reference is not None:
+            return contextual_reference
 
         result_reference = any(
             phrase in text
@@ -310,17 +266,28 @@ class DecisionMaker:
         if not previous_message_follow_up:
             return None
 
-        if len(context.recent_messages) < 2:
-            return None
+        previous_user_message = (
+            self._previous_user_message(context)
+        )
 
-        for message in reversed(context.recent_messages[:-1]):
-            if message.get("role") == "user":
-                content = str(
-                    message.get("content", "")
-                ).strip()
+        return previous_user_message
 
-                if content:
-                    return content
+    def _previous_user_message(
+        self,
+        context: ContextSnapshot,
+    ) -> str | None:
+        for message in reversed(
+            context.recent_messages[:-1]
+        ):
+            if message.get("role") != "user":
+                continue
+
+            content = str(
+                message.get("content", "")
+            ).strip()
+
+            if content:
+                return content
 
         return None
 
@@ -352,3 +319,4 @@ class DecisionMaker:
                 return memory.value
 
         return None
+

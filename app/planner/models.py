@@ -1,5 +1,6 @@
 ﻿from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 
 class PlanStepType(str, Enum):
@@ -10,14 +11,20 @@ class PlanStepType(str, Enum):
 
 @dataclass(frozen=True)
 class PlanStep:
-    step_id: str
-    step_type: PlanStepType
-    description: str
     tool_name: str | None = None
-    arguments: dict = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
+    step_id: str = "step_1"
+    step_type: PlanStepType = PlanStepType.TOOL
+    description: str = ""
 
 
 @dataclass(frozen=True)
 class ExecutionPlan:
     goal: str
-    steps: list[PlanStep]
+    steps: tuple[PlanStep, ...] | list[PlanStep] = field(
+        default_factory=tuple
+    )
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.steps

@@ -34,7 +34,6 @@ class RivaAgentLoop:
         )
 
         for _ in range(self.MAX_STEPS):
-
             if getattr(
                 self._decision,
                 "supports_context",
@@ -61,19 +60,18 @@ class RivaAgentLoop:
                 return result
 
             if decision.decision_type == DecisionType.USE_TOOL:
-
                 if not decision.tool_name:
                     raise ValueError(
                         "Tool decision requires a tool name."
                     )
 
-                self._orchestrator.execute_tool(
+                execution = self._orchestrator.execute_tool(
                     orchestration,
                     decision.tool_name,
                     **(decision.tool_arguments or {}),
                 )
 
-                latest = orchestration.executions[-1]
+                latest = execution.executions[-1]
 
                 if latest.status.value != "success":
                     result = self._orchestrator.respond(
@@ -89,12 +87,10 @@ class RivaAgentLoop:
 
                     return result
 
-                tool_output = str(latest.result)
-
                 if not multi_step:
                     result = self._orchestrator.respond(
                         orchestration,
-                        tool_output,
+                        str(latest.result),
                     )
 
                     if result.response:

@@ -5679,3 +5679,145 @@ def test_default_decision_maker_resolves_contextual_why_request():
     )
 
     assert second.response == "The project deadline is Friday"
+
+def test_default_decision_maker_resolves_possessive_context_reference():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="context-aware-possessive",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="The project is called Aurora",
+    )
+
+    assert first.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    second = loop.run(
+        session=session,
+        user_input="What are its goals?",
+    )
+
+    assert second.response == "The project is called Aurora"
+
+
+def test_default_decision_maker_resolves_context_reference_to_relevant_topic():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="context-aware-topic",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="My favorite color is blue",
+    )
+
+    assert first.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    second = loop.run(
+        session=session,
+        user_input="The project is called Aurora",
+    )
+
+    assert second.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    third = loop.run(
+        session=session,
+        user_input="Tell me about the project",
+    )
+
+    assert third.response == "The project is called Aurora"
+
+
+def test_default_decision_maker_resolves_context_reference_to_recent_statement():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="context-aware-recent-statement",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="The meeting is scheduled for Friday",
+    )
+
+    assert first.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    second = loop.run(
+        session=session,
+        user_input="It is an important meeting",
+    )
+
+    assert second.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    third = loop.run(
+        session=session,
+        user_input="When is the meeting?",
+    )
+
+    assert third.response == "It is an important meeting"

@@ -3,6 +3,9 @@ from app.agent_loop.models import DecisionType
 from app.core.session import RivaSession
 from app.orchestration.models import OrchestrationResult
 from app.orchestration.orchestrator import RivaOrchestrator
+from app.planner.executor import PlanExecutor
+from app.planner.planner import RivaPlanner
+from app.verification.correction import SelfCorrector
 
 
 class RivaAgentLoop:
@@ -12,9 +15,22 @@ class RivaAgentLoop:
         self,
         orchestrator: RivaOrchestrator,
         decision_maker: DecisionMaker | None = None,
+        planner: RivaPlanner | None = None,
+        corrector: SelfCorrector | None = None,
     ) -> None:
         self._orchestrator = orchestrator
         self._decision = decision_maker or DecisionMaker()
+
+        self._planner = planner or RivaPlanner()
+
+        if corrector is None:
+            self._corrector = SelfCorrector(
+                PlanExecutor(
+                    self._orchestrator.execution_engine
+                )
+            )
+        else:
+            self._corrector = corrector
 
     def run(
         self,
@@ -34,7 +50,6 @@ class RivaAgentLoop:
         )
 
         for _ in range(self.MAX_STEPS):
-
             if getattr(
                 self._decision,
                 "supports_context",
@@ -61,26 +76,18 @@ class RivaAgentLoop:
                 return result
 
             if decision.decision_type == DecisionType.USE_TOOL:
-
-                if not decision.tool_name:
-                    raise ValueError(
-                        "Tool decision requires a tool name."
-                    )
-
-                self._orchestrator.execute_tool(
-                    orchestration,
-                    decision.tool_name,
-                    **(decision.tool_arguments or {}),
+                plan = self._planner.create_plan(
+                    user_input
                 )
 
-                latest = orchestration.executions[-1]
+                correction = self._corrector.run(plan)
 
-                if latest.status.value != "success":
+                if not correction.success:
                     result = self._orchestrator.respond(
                         orchestration,
                         (
                             "I couldn't complete that action: "
-                            f"{latest.error}"
+                            f"{correction.error}"
                         ),
                     )
 
@@ -89,12 +96,10 @@ class RivaAgentLoop:
 
                     return result
 
-                tool_output = str(latest.result)
-
-                if not multi_step:
+                if not correction.outputs:
                     result = self._orchestrator.respond(
                         orchestration,
-                        tool_output,
+                        "The action completed without a result.",
                     )
 
                     if result.response:
@@ -102,7 +107,20 @@ class RivaAgentLoop:
 
                     return result
 
-                continue
+                final_output = correction.outputs[-1]
+
+                result = self._orchestrator.respond(
+                    orchestration,
+                    final_output,
+                )
+
+                if result.response:
+                    session.last_response = result.response
+
+                if not multi_step:
+                    return result
+
+                return result
 
             raise RuntimeError(
                 f"Unsupported decision: "
