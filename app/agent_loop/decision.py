@@ -60,7 +60,10 @@ class DecisionMaker:
             )
 
         if any(
-            greeting in text
+            re.search(
+                rf"\b{re.escape(greeting)}\b",
+                text,
+            )
             for greeting in (
                 "hello",
                 "hi",
@@ -120,6 +123,35 @@ class DecisionMaker:
                         decision_type=DecisionType.RESPOND,
                         response=previous_user_message,
                     )
+
+            return None
+
+        natural_reference = any(
+            re.search(
+                rf"\b{re.escape(reference)}\b",
+                text,
+            )
+            for reference in (
+                "this",
+                "above",
+            )
+        )
+
+        if natural_reference:
+            if len(context.recent_messages) >= 2:
+                for message in reversed(
+                    context.recent_messages[:-1]
+                ):
+                    if message.get("role") == "user":
+                        previous_user_message = str(
+                            message.get("content", "")
+                        ).strip()
+
+                        if previous_user_message:
+                            return AgentDecision(
+                                decision_type=DecisionType.RESPOND,
+                                response=previous_user_message,
+                            )
 
             return None
 
