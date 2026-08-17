@@ -5476,3 +5476,84 @@ def test_default_decision_maker_resolves_previous_statement_with_that():
     )
 
     assert second.response == "The project deadline is Friday"
+
+def test_default_decision_maker_resolves_previous_topic_with_this():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="natural-reference-this",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="The project is called Aurora",
+    )
+
+    assert first.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    second = loop.run(
+        session=session,
+        user_input="Tell me more about this",
+    )
+
+    assert second.response == "The project is called Aurora"
+
+
+def test_default_decision_maker_resolves_previous_topic_with_the_above():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    loop = RivaAgentLoop(
+        orchestrator=RivaOrchestrator(
+            registry=create_default_registry(),
+            memory_manager=MemoryManager(
+                MemoryStore(database_path),
+            ),
+        ),
+        decision_maker=DecisionMaker(),
+    )
+
+    session = RivaSession(
+        session_id="natural-reference-above",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="The meeting is scheduled for Friday",
+    )
+
+    assert first.response == (
+        "I understand your request, "
+        "but I don't have a capability for it yet."
+    )
+
+    second = loop.run(
+        session=session,
+        user_input="What about the above?",
+    )
+
+    assert second.response == "The meeting is scheduled for Friday"
