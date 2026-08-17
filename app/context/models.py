@@ -8,3 +8,4 @@ class ContextSnapshot:
     session_id: str
     recent_messages: list[dict] = field(default_factory=list)
     memories: list[Memory] = field(default_factory=list)
+    last_response: str = ""

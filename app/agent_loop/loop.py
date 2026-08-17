@@ -33,28 +33,31 @@ class RivaAgentLoop:
             False,
         )
 
-        supports_context = getattr(
-            self._decision,
-            "supports_context",
-            False,
-        )
-
         for _ in range(self.MAX_STEPS):
-            if supports_context:
+            if getattr(
+                self._decision,
+                "supports_context",
+                False,
+            ):
                 decision = self._decision.decide(
                     user_input,
                     orchestration.context,
                 )
             else:
                 decision = self._decision.decide(
-                    user_input,
+                    user_input
                 )
 
             if decision.decision_type == DecisionType.RESPOND:
-                return self._orchestrator.respond(
+                result = self._orchestrator.respond(
                     orchestration,
                     decision.response or "",
                 )
+
+                if result.response:
+                    session.last_response = result.response
+
+                return result
 
             if decision.decision_type == DecisionType.USE_TOOL:
                 if not decision.tool_name:
@@ -71,7 +74,7 @@ class RivaAgentLoop:
                 latest = execution.executions[-1]
 
                 if latest.status.value != "success":
-                    return self._orchestrator.respond(
+                    result = self._orchestrator.respond(
                         orchestration,
                         (
                             "I couldn't complete that action: "
@@ -79,11 +82,21 @@ class RivaAgentLoop:
                         ),
                     )
 
+                    if result.response:
+                        session.last_response = result.response
+
+                    return result
+
                 if not multi_step:
-                    return self._orchestrator.respond(
+                    result = self._orchestrator.respond(
                         orchestration,
                         str(latest.result),
                     )
+
+                    if result.response:
+                        session.last_response = result.response
+
+                    return result
 
                 continue
 
@@ -92,7 +105,12 @@ class RivaAgentLoop:
                 f"{decision.decision_type}"
             )
 
-        return self._orchestrator.respond(
+        result = self._orchestrator.respond(
             orchestration,
             "I reached the maximum number of steps for this request.",
         )
+
+        if result.response:
+            session.last_response = result.response
+
+        return result

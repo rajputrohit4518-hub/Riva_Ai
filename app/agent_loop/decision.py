@@ -75,10 +75,7 @@ class DecisionMaker:
         text: str,
         context: ContextSnapshot,
     ) -> str | None:
-        if len(context.recent_messages) < 2:
-            return None
-
-        follow_up = any(
+        previous_message_follow_up = any(
             phrase in text
             for phrase in (
                 "what did i just tell you",
@@ -89,18 +86,41 @@ class DecisionMaker:
             )
         )
 
-        if not follow_up:
+        result_reference = any(
+            phrase in text
+            for phrase in (
+                "what was the result",
+                "what was the answer",
+                "what was the calculation",
+                "what did you calculate",
+                "what did you get",
+                "what was that result",
+                "what was that answer",
+            )
+        )
+
+        if result_reference:
+            if context.last_response:
+                return context.last_response
+
+            return None
+
+        if not previous_message_follow_up:
+            return None
+
+        if len(context.recent_messages) < 2:
             return None
 
         for message in reversed(context.recent_messages[:-1]):
             if message.get("role") == "user":
-                content = str(message.get("content", "")).strip()
+                content = str(
+                    message.get("content", "")
+                ).strip()
 
                 if content:
                     return content
 
         return None
-
     def _memory_response(
         self,
         text: str,
@@ -129,3 +149,4 @@ class DecisionMaker:
                 return memory.value
 
         return None
+

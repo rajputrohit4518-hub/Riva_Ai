@@ -5200,3 +5200,44 @@ def test_default_decision_maker_uses_previous_user_message_for_follow_up():
         result.response
         == "My favorite programming language is Python."
     )
+
+def test_default_decision_maker_resolves_previous_calculation_result():
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        suffix=".db",
+        delete=False,
+    ) as tmp:
+        database_path = tmp.name
+
+    orchestrator = RivaOrchestrator(
+        registry=create_default_registry(),
+        memory_manager=MemoryManager(
+            MemoryStore(database_path),
+        ),
+    )
+
+    decision_maker = DecisionMaker()
+
+    loop = RivaAgentLoop(
+        orchestrator=orchestrator,
+        decision_maker=decision_maker,
+    )
+
+    session = RivaSession(
+        session_id="reference-calculation",
+    )
+
+    first = loop.run(
+        session=session,
+        user_input="calculate 25 * 6",
+    )
+
+    assert first.response == "150"
+
+    second = loop.run(
+        session=session,
+        user_input="What was the result?",
+    )
+
+    assert second.response == "150"

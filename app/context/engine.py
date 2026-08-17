@@ -26,4 +26,5 @@ class ContextEngine:
             session_id=session.session_id,
             recent_messages=session.history(),
             memories=memories,
+            last_response=session.last_response,
         )
