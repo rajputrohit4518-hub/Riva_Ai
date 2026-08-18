@@ -76,16 +76,28 @@ class RivaAgentLoop:
                 latest = orchestration.executions[-1]
 
                 if latest.status.value != "success":
+
+
+                    if multi_step:
+
+
+                        continue
+
+
+                
+
+
                     result = self._orchestrator.respond(
+
+
                         orchestration,
-                        (
-                            "I couldn't complete that action: "
-                            f"{latest.error}"
-                        ),
+
+
+                        latest.error or "Tool execution failed.",
+
+
                     )
 
-                    if result.response:
-                        session.last_response = result.response
 
                     return result
 
