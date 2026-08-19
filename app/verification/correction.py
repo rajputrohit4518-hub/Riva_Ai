@@ -8,6 +8,19 @@ from app.verification.verifier import ResultVerifier
 
 
 class SelfCorrector:
+    def correct(
+        self,
+        plan: ExecutionPlan,
+        error: str | None,
+    ) -> ExecutionPlan:
+        """Return a corrected plan.
+
+        Current strategy keeps the original plan unchanged.
+        Future Riva intelligence can override this method with
+        LLM-based correction.
+        """
+        return plan
+
     def __init__(
         self,
         executor: PlanExecutor,
@@ -39,6 +52,7 @@ class SelfCorrector:
 
             if not result.success:
                 last_error = result.error
+                plan = self.correct(plan, last_error)
                 continue
 
             final_output = (

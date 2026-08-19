@@ -11,21 +11,14 @@ class Calculator:
         allowed = set("0123456789+-*/(). %")
 
         if any(char not in allowed for char in expression):
-            raise ValueError("Invalid arithmetic expression.")
+            raise ValueError("Invalid characters in expression.")
 
         try:
             result = eval(expression, {"__builtins__": {}}, {})
         except Exception as exc:
-            raise ValueError("Invalid arithmetic expression.") from exc
+            raise ValueError(f"Invalid arithmetic expression: {expression}") from exc
 
         if isinstance(result, float) and result.is_integer():
             return str(int(result))
 
         return str(result)
-
-
-def calculate(expression: str) -> str:
-    return Calculator().calculate(expression)
-
-def calculate_expression(expression: str) -> str:
-    return calculate(expression)

@@ -25,12 +25,12 @@ class BrainGateway:
                     "Tool decision requires a tool name."
                 )
 
-            try:
-                self._registry.get(decision.tool_name)
-            except KeyError as exc:
+            tool = self._registry.get(decision.tool_name)
+
+            if tool is None:
                 raise ValueError(
                     f"Unknown tool: {decision.tool_name}"
-                ) from exc
+                )
 
             if decision.response:
                 raise ValueError(

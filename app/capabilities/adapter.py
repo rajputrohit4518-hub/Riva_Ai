@@ -21,12 +21,12 @@ class CapabilityAdapter:
         permission: PermissionLevel = PermissionLevel.NONE,
     ) -> Capability:
 
-        try:
-            tool = self._tools.get(tool_name)
-        except KeyError as exc:
+        tool = self._tools.get(tool_name)
+
+        if tool is None:
             raise ValueError(
                 f"Cannot expose unknown tool: {tool_name}"
-            ) from exc
+            )
 
         capability = Capability(
             name=tool.name,

@@ -1,52 +1,107 @@
-﻿from typing import Dict, List
+﻿from __future__ import annotations
 
-from app.security.models import PermissionDecision
-from app.security.permissions import PermissionEngine
+from typing import Any, Callable
+
 from app.tools.models import ToolDefinition
 
 
 class ToolRegistry:
-    def __init__(
+    """
+    Central registry for Riva tools.
+    """
+
+    def __init__(self) -> None:
+        self._tools: dict[str, ToolDefinition] = {}
+
+    def register(
         self,
-        permission_engine: PermissionEngine | None = None,
-    ) -> None:
-        self._tools: Dict[str, ToolDefinition] = {}
-        self._permissions = permission_engine or PermissionEngine()
+        name: str | ToolDefinition,
+        handler: Callable[..., Any] | None = None,
+        description: str = "",
+        category: str = "general",
+        risk_level: str = "low",
+        requires_confirmation: bool = False,
+    ) -> ToolDefinition:
 
-    def register(self, tool: ToolDefinition) -> None:
-        if tool.name in self._tools:
-            raise ValueError(f"Tool already registered: {tool.name}")
+        if isinstance(name, ToolDefinition):
+            if handler is not None:
+                raise TypeError(
+                    "handler must not be supplied when registering "
+                    "a ToolDefinition."
+                )
+            definition = name
 
-        self._tools[tool.name] = tool
+        else:
+            tool_name = name.strip()
 
-    def get(self, name: str) -> ToolDefinition:
-        try:
-            return self._tools[name]
-        except KeyError as exc:
-            raise KeyError(f"Tool not found: {name}") from exc
+            if not tool_name:
+                raise ValueError("Tool name cannot be empty.")
 
-    def remove(self, name: str) -> None:
-        if name not in self._tools:
-            raise KeyError(f"Tool not found: {name}")
+            if not callable(handler):
+                raise TypeError("Tool handler must be callable.")
 
-        del self._tools[name]
-
-    def list(self) -> List[ToolDefinition]:
-        return list(self._tools.values())
-
-    def execute(self, name: str, **kwargs) -> str:
-        tool = self.get(name)
-
-        decision = self._permissions.evaluate(tool.risk_level)
-
-        if decision == PermissionDecision.DENY:
-            raise PermissionError(
-                f"Tool execution denied: {tool.name}"
+            definition = ToolDefinition(
+                name=tool_name,
+                description=description.strip(),
+                executor=handler,
+                category=category,
+                risk_level=risk_level,
+                requires_confirmation=requires_confirmation,
             )
 
-        if decision == PermissionDecision.CONFIRM:
-            raise PermissionError(
-                f"Confirmation required for tool: {tool.name}"
+        if definition.name in self._tools:
+            raise ValueError(
+                f"Tool '{definition.name}' is already registered."
             )
 
-        return tool.executor(**kwargs)
+        self._tools[definition.name] = definition
+        return definition
+
+    def unregister(self, name: str) -> bool:
+        return self._tools.pop(name.strip(), None) is not None
+
+    def get(self, name: str) -> ToolDefinition | None:
+        return self._tools.get(name.strip())
+
+    def has(self, name: str) -> bool:
+        return name.strip() in self._tools
+
+    def names(self) -> list[str]:
+        return sorted(self._tools)
+
+    def list(self) -> list[ToolDefinition]:
+        return [
+            self._tools[name]
+            for name in sorted(self._tools)
+        ]
+
+    def execute(self, name: str, **kwargs: Any) -> Any:
+        definition = self.get(name)
+
+        if definition is None:
+            raise KeyError(f"Unknown tool: {name}")
+
+        risk = definition.risk_level.lower()
+
+        if risk == "critical":
+            raise PermissionError(
+                f"Tool '{name}' execution denied."
+            )
+
+        if risk == "medium":
+            raise PermissionError(
+                f"Tool '{name}': Confirmation required."
+            )
+
+        if definition.requires_confirmation and risk != "low":
+            raise PermissionError(
+                f"Tool '{name}' requires confirmation."
+            )
+
+        return definition.executor(**kwargs)
+
+    def clear(self) -> None:
+        self._tools.clear()
+
+    def __len__(self) -> int:
+        return len(self._tools)

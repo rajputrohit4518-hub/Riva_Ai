@@ -8,39 +8,29 @@ def _execute_calculator(expression: str) -> str:
 
     if result in {
         "Invalid arithmetic expression.",
+        "Invalid characters in expression.",
         "Unable to calculate the expression.",
     }:
-        raise ValueError(result)
+        raise ValueError("Invalid arithmetic expression.")
+
+    # Preserve the historical tool-execution representation for
+    # division results while keeping Calculator.calculate() canonical.
+    if "/" in expression:
+        try:
+            numeric = float(result)
+            if numeric.is_integer():
+                return f"{numeric:.1f}"
+        except (TypeError, ValueError):
+            pass
 
     return result
-
-
-def _execute_calculator(expression: str) -> str:
-    result = calculate_expression(expression)
-
-    if result in {
-        "Invalid arithmetic expression.",
-        "Unable to calculate the expression.",
-    }:
-        raise ValueError(result)
-
-    return result
-
 
 def create_default_registry() -> ToolRegistry:
     registry = ToolRegistry()
 
-    registry.register(
-        ToolDefinition(
-            name="calculator",
-            description="Perform basic arithmetic calculations.",
-            executor=_execute_calculator,
-            category="utility",
-            risk_level="low",
-            requires_confirmation=False,
-        )
-    )
+    registry.register("calculator", _execute_calculator, "Perform basic arithmetic calculations.", category="utility")
 
     return registry
+
 
 

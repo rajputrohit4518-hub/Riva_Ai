@@ -10,3 +10,8 @@ class ToolDefinition:
     category: str = "general"
     risk_level: str = "low"
     requires_confirmation: bool = False
+
+    @property
+    def handler(self) -> Callable[..., str]:
+        """Backward-compatible alias for executor."""
+        return self.executor
