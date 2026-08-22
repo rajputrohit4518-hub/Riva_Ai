@@ -22,6 +22,16 @@ class ContextEngine:
             limit=memory_limit,
         )
 
+        # Prefer the most recently updated memory when multiple
+        # memories match the same conversational query.
+        memories.sort(
+            key=lambda memory: (
+                memory.updated_at
+                or memory.created_at
+            ),
+            reverse=True,
+        )
+
         return ContextSnapshot(
             session_id=session.session_id,
             recent_messages=session.history(),

@@ -13,13 +13,14 @@ class MemoryCategory(str, Enum):
     PROJECT = "project"
     ROUTINE = "routine"
     IDENTITY = "identity"
+    PROGRAMMING = "programming"
     GENERAL = "general"
 
 
 @dataclass(frozen=True)
 class MemoryDecision:
     action: MemoryAction
-    category: MemoryCategory
+    category: str
     reason: str
 
 
@@ -51,3 +52,4 @@ class MemoryPolicy:
             category=resolved_category,
             reason="Explicit memory request.",
         )
+

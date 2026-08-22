@@ -49,6 +49,42 @@ class RivaAgentLoop:
                     user_input
                 )
 
+            if decision.decision_type == DecisionType.MEMORY:
+                if decision.memory_action == "remember":
+                    self._orchestrator._memory.remember(
+                        decision.memory_key or "",
+                        decision.memory_value or "",
+                    )
+
+                    result = self._orchestrator.respond(
+                        orchestration,
+                        decision.response or "I'll remember that.",
+                    )
+
+                    if result.response:
+                        session.last_response = result.response
+
+                    return result
+
+                if decision.memory_action == "forget":
+                    self._orchestrator._memory.forget(
+                        decision.memory_key or "",
+                    )
+
+                    result = self._orchestrator.respond(
+                        orchestration,
+                        decision.response or "I'll forget that.",
+                    )
+
+                    if result.response:
+                        session.last_response = result.response
+
+                    return result
+
+                raise ValueError(
+                    f"Unsupported memory action: {decision.memory_action}"
+                )
+
             if decision.decision_type == DecisionType.RESPOND:
                 result = self._orchestrator.respond(
                     orchestration,

@@ -17,3 +17,6 @@ class ParsedIntent:
     confidence: float = 1.0
     expression: str | None = None
     tool_name: str | None = None
+    memory_key: str | None = None
+    memory_value: str | None = None
+    memory_action: str | None = None

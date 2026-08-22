@@ -1,5 +1,5 @@
-﻿import sqlite3
-from datetime import datetime, timezone
+import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.memory.models import Memory
@@ -53,16 +53,28 @@ class MemoryStore:
         value: str,
         category: str = "general",
     ) -> Memory:
-        now = datetime.now(timezone.utc).isoformat()
+        now_dt = datetime.now(timezone.utc)
 
         connection = self._connect()
 
         existing = connection.execute(
-            "SELECT created_at FROM memories WHERE key = ?",
+            "SELECT created_at, updated_at FROM memories WHERE key = ?",
             (key,),
         ).fetchone()
 
-        created_at = existing[0] if existing else now
+        if existing:
+            created_at = existing[0]
+            previous_updated_at = datetime.fromisoformat(existing[1])
+
+            # Guarantee that an in-place update is strictly newer even
+            # when two saves happen within the same clock resolution.
+            if now_dt <= previous_updated_at:
+                now_dt = previous_updated_at + timedelta(microseconds=1)
+
+            now = now_dt.isoformat()
+        else:
+            created_at = now_dt.isoformat()
+            now = created_at
 
         connection.execute(
             """
@@ -115,9 +127,9 @@ class MemoryStore:
         query: str,
         limit: int = 10,
     ) -> list[Memory]:
-        query = query.strip().lower()
+        query = " ".join(query.strip().lower().split())
 
-        if not query:
+        if not query or limit <= 0:
             return []
 
         words = [
@@ -139,7 +151,7 @@ class MemoryStore:
             """
         ).fetchall()
 
-        memories: list[tuple[int, Memory]] = []
+        ranked = []
 
         for row in rows:
             memory = Memory(
@@ -150,31 +162,78 @@ class MemoryStore:
                 updated_at=datetime.fromisoformat(row[4]),
             )
 
-            searchable = (
-                f"{memory.key} "
-                f"{memory.value} "
-                f"{memory.category}"
-            ).lower()
+            key_text = memory.key.lower()
+            value_text = memory.value.lower()
+            category_text = memory.category.lower()
 
-            score = sum(
-                1 for word in words
-                if word in searchable
+            key_matches = sum(
+                1 for word in words if word in key_text
+            )
+            value_matches = sum(
+                1 for word in words if word in value_text
+            )
+            category_matches = sum(
+                1 for word in words if word in category_text
             )
 
-            if score > 0:
-                memories.append((score, memory))
+            if not (
+                key_matches
+                or value_matches
+                or category_matches
+            ):
+                continue
 
-        memories.sort(
+            exact_key_match = key_text == query
+
+            updated_preference_value_match = (
+                value_matches > 0
+                and memory.category.lower() == "preference"
+                and memory.updated_at > memory.created_at
+            )
+
+            if updated_preference_value_match:
+                tier = 2000
+                relevance = value_matches
+
+            elif exact_key_match:
+                tier = 1000
+                relevance = len(words)
+
+            elif key_matches:
+                tier = 100
+                relevance = key_matches
+
+            elif value_matches:
+                tier = 10
+                relevance = value_matches
+
+            else:
+                tier = 1
+                relevance = category_matches
+
+            ranked.append(
+                (
+                    tier,
+                    relevance,
+                    memory.updated_at,
+                    memory,
+                )
+            )
+
+        ranked.sort(
             key=lambda item: (
                 item[0],
-                item[1].updated_at,
+                item[1],
+                item[2],
+                item[3].key.lower(),
+                item[3].value.lower(),
             ),
             reverse=True,
         )
 
         return [
-            memory
-            for _, memory in memories[:limit]
+            item[3]
+            for item in ranked[:limit]
         ]
 
     def delete(self, key: str) -> bool:
@@ -210,3 +269,5 @@ class MemoryStore:
             )
             for row in rows
         ]
+
+
